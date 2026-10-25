@@ -1,0 +1,38 @@
+name: Validate tourism platform
+on: [push, pull_request]
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:17-alpine
+        env:
+          POSTGRES_USER: kttravel
+          POSTGRES_PASSWORD: ci-only-password
+          POSTGRES_DB: kttravel_test
+        ports: ["55432:5432"]
+        options: --health-cmd "pg_isready -U kttravel -d kttravel_test" --health-interval 5s --health-timeout 3s --health-retries 20
+      redis:
+        image: redis:7-alpine
+        ports: ["56379:6379"]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: |
+          printf '%s\n' 'DATABASE_URL=postgresql://kttravel:ci-only-password@127.0.0.1:55432/kttravel_test?schema=public' 'REDIS_URL=redis://127.0.0.1:56379' 'WEB_ORIGIN=http://localhost:3000' 'NODE_ENV=test' > .env
+      - run: npm run typecheck
+      - run: npm test
+      - run: npm run test:integration
+      - run: npm run build
+      - run: npm audit --audit-level=high
+      - run: npx playwright install --with-deps msedge
+      - run: npm run test:e2e
+      - uses: actions/upload-artifact@v4
+        if: failure()
+        with:
+          name: browser-test-report
+          path: playwright-report/

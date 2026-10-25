@@ -1,0 +1,238 @@
+generator client {
+ provider = "prisma-client-js"
+}
+datasource db {
+ provider = "postgresql"
+ url = env("DATABASE_URL")
+}
+enum Role {
+ CUSTOMER
+ OPERATOR
+ ADMIN
+}
+enum BookingStatus {
+ PENDING
+ CONFIRMED
+ CANCELLED
+ COMPLETED
+ REJECTED
+}
+enum Publication {
+ DRAFT
+ PUBLISHED
+ ARCHIVED
+}
+model User {
+ id String @id @default(uuid()) @db.Uuid
+ email String @unique
+ name String
+ passwordHash String
+ role Role @default(CUSTOMER)
+ createdAt DateTime @default(now())
+ sessions Session[]
+ bookings Booking[]
+ reviews Review[]
+ notifications Notification[]
+ messages Message[] @relation("ThreadOwner")
+ sentMessages Message[] @relation("MessageSender")
+ media Media[]
+}
+model Session {
+ id String @id @default(uuid()) @db.Uuid
+ tokenHash String @unique
+ csrfToken String
+ userId String @db.Uuid
+ user User @relation(fields:[userId],references:[id],onDelete:Cascade)
+ expiresAt DateTime
+ @@index([expiresAt])
+}
+model Destination {
+ id String @id @default(uuid()) @db.Uuid
+ slug String @unique
+ title Json
+ description Json
+ attractions Attraction[]
+}
+model Attraction {
+ id String @id @default(uuid()) @db.Uuid
+ slug String @unique
+ title Json
+ description Json
+ latitude Float
+ longitude Float
+ image String
+ verified Boolean @default(false)
+ destinationId String @db.Uuid
+ destination Destination @relation(fields:[destinationId],references:[id],onDelete:Restrict)
+ waypoints Waypoint[]
+}
+model Tour {
+ id String @id @default(uuid()) @db.Uuid
+ slug String @unique
+ title Json
+ description Json
+ seoTitle Json
+ cancellationPolicy Json
+ category String
+ durationDays Int
+ nights Int
+ minParticipants Int
+ maxParticipants Int
+ featuredImage String
+ included String[]
+ excluded String[]
+ requirements String[]
+ status Publication @default(DRAFT)
+ createdAt DateTime @default(now())
+ updatedAt DateTime @updatedAt
+ days ItineraryDay[]
+ images TourImage[]
+ departures Departure[]
+ reviews Review[]
+ @@index([status,category])
+}
+model TourImage {
+ id String @id @default(uuid()) @db.Uuid
+ tourId String @db.Uuid
+ tour Tour @relation(fields:[tourId],references:[id],onDelete:Cascade)
+ path String
+ alt Json
+ position Int
+ @@unique([tourId,position])
+}
+model ItineraryDay {
+ id String @id @default(uuid()) @db.Uuid
+ tourId String @db.Uuid
+ tour Tour @relation(fields:[tourId],references:[id],onDelete:Cascade)
+ day Int
+ title Json
+ description Json
+ waypoints Waypoint[]
+ @@unique([tourId,day])
+}
+model Waypoint {
+ id String @id @default(uuid()) @db.Uuid
+ dayId String @db.Uuid
+ day ItineraryDay @relation(fields:[dayId],references:[id],onDelete:Cascade)
+ attractionId String @db.Uuid
+ attraction Attraction @relation(fields:[attractionId],references:[id],onDelete:Restrict)
+ position Int
+ @@unique([dayId,position])
+}
+model Departure {
+ id String @id @default(uuid()) @db.Uuid
+ tourId String @db.Uuid
+ tour Tour @relation(fields:[tourId],references:[id],onDelete:Restrict)
+ startsAt DateTime
+ capacity Int
+ reserved Int @default(0)
+ price Json
+ published Boolean @default(false)
+ createdAt DateTime @default(now())
+ bookings Booking[]
+ @@unique([tourId,startsAt])
+ @@index([startsAt,published])
+}
+model Booking {
+ id String @id @default(uuid()) @db.Uuid
+ userId String @db.Uuid
+ user User @relation(fields:[userId],references:[id],onDelete:Restrict)
+ departureId String @db.Uuid
+ departure Departure @relation(fields:[departureId],references:[id],onDelete:Restrict)
+ idempotencyKey String
+ requestHash String
+ status BookingStatus @default(PENDING)
+ name String
+ phone String
+ locale String
+ adults Int
+ children Int
+ seats Int
+ totalMinor BigInt
+ currency String @default("UZS")
+ priceSnapshot Json
+ extras String[]
+ privateTour Boolean @default(false)
+ createdAt DateTime @default(now())
+ updatedAt DateTime @updatedAt
+ history BookingHistory[]
+ review Review?
+ @@unique([userId,idempotencyKey])
+ @@index([departureId,status])
+ @@index([userId,createdAt])
+}
+model BookingHistory {
+ id String @id @default(uuid()) @db.Uuid
+ bookingId String @db.Uuid
+ booking Booking @relation(fields:[bookingId],references:[id],onDelete:Restrict)
+ status BookingStatus
+ actorId String @db.Uuid
+ createdAt DateTime @default(now())
+}
+model Review {
+ id String @id @default(uuid()) @db.Uuid
+ bookingId String @unique @db.Uuid
+ booking Booking @relation(fields:[bookingId],references:[id],onDelete:Restrict)
+ userId String @db.Uuid
+ user User @relation(fields:[userId],references:[id],onDelete:Restrict)
+ tourId String @db.Uuid
+ tour Tour @relation(fields:[tourId],references:[id],onDelete:Restrict)
+ rating Int
+ text String
+ published Boolean @default(false)
+ createdAt DateTime @default(now())
+ @@index([tourId,published])
+}
+model Notification {
+ id String @id @default(uuid()) @db.Uuid
+ userId String @db.Uuid
+ user User @relation(fields:[userId],references:[id],onDelete:Cascade)
+ bookingId String @db.Uuid
+ event String
+ readAt DateTime?
+ createdAt DateTime @default(now())
+ @@index([userId,createdAt])
+ @@unique([bookingId,event])
+}
+model Outbox {
+ id String @id @default(uuid()) @db.Uuid
+ payload Json
+ deliveredAt DateTime?
+ createdAt DateTime @default(now())
+ @@index([deliveredAt,createdAt])
+}
+model AuditLog {
+ id String @id @default(uuid()) @db.Uuid
+ actorId String @db.Uuid
+ action String
+ entityId String
+ metadata Json
+ createdAt DateTime @default(now())
+ @@index([entityId,createdAt])
+}
+model Setting {
+ key String @id
+ value Json
+ updatedAt DateTime @updatedAt
+}
+model Message {
+ id String @id @default(uuid()) @db.Uuid
+ userId String @db.Uuid
+ senderId String @db.Uuid
+ user User @relation("ThreadOwner",fields:[userId],references:[id],onDelete:Restrict)
+ sender User @relation("MessageSender",fields:[senderId],references:[id],onDelete:Restrict)
+ body String
+ createdAt DateTime @default(now())
+ @@index([userId,createdAt])
+}
+model Media {
+ id String @id @default(uuid()) @db.Uuid
+ objectKey String @unique
+ alt Json
+ width Int
+ height Int
+ sizeBytes Int
+ uploaderId String @db.Uuid
+ uploader User @relation(fields:[uploaderId],references:[id],onDelete:Restrict)
+ createdAt DateTime @default(now())
+}

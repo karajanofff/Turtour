@@ -1,0 +1,13 @@
+node_modules
+**/node_modules
+**/.next
+**/dist
+.git
+.env
+.env.*
+!.env.example
+test-results
+playwright-report
+coverage
+*.zip
+package-lock.previous.json

@@ -1,0 +1,39 @@
+services:
+  api:
+    build:
+      context: .
+      dockerfile: infrastructure/docker/api.Dockerfile
+    env_file: .env.production
+    depends_on:
+      postgres: {condition: service_healthy}
+      redis: {condition: service_healthy}
+    restart: unless-stopped
+  worker:
+    build:
+      context: .
+      dockerfile: infrastructure/docker/api.Dockerfile
+    command: ["node", "apps/api/dist/apps/api/src/worker.js"]
+    env_file: .env.production
+    depends_on:
+      postgres: {condition: service_healthy}
+      redis: {condition: service_healthy}
+    restart: unless-stopped
+  web:
+    build:
+      context: .
+      dockerfile: infrastructure/docker/web.Dockerfile
+      args:
+        API_INTERNAL_URL: http://api:4000
+        SITE_URL: ${SITE_URL:?Set SITE_URL}
+    environment:
+      API_INTERNAL_URL: http://api:4000
+      SITE_URL: ${SITE_URL}
+      NODE_ENV: production
+    depends_on: [api]
+    restart: unless-stopped
+  nginx:
+    image: nginx:1.28-alpine
+    ports: ["127.0.0.1:8080:80"]
+    volumes: ["./infrastructure/nginx/default.conf:/etc/nginx/conf.d/default.conf:ro"]
+    depends_on: [web]
+    restart: unless-stopped

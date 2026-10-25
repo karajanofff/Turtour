@@ -1,0 +1,39 @@
+{
+  "name": "karakalpakstan-travel",
+  "private": true,
+  "version": "0.1.0",
+  "engines": {
+    "node": ">=22"
+  },
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ],
+  "scripts": {
+    "dev:web": "node --env-file=.env node_modules/next/dist/bin/next dev apps/web --hostname 127.0.0.1 --port 3000",
+    "dev:api": "node --env-file=.env node_modules/tsx/dist/cli.mjs --tsconfig apps/api/tsconfig.json apps/api/src/main.ts",
+    "build": "npm run generate -w @kt/api && npm run build -w @kt/api && npm run build -w @kt/web",
+    "typecheck": "npm run generate -w @kt/api && tsc -p apps/api/tsconfig.json --noEmit && tsc -p apps/web/tsconfig.json --noEmit",
+    "test": "vitest run",
+    "test:integration": "node --env-file=.env scripts/integration.mjs",
+    "test:e2e": "playwright test",
+    "db:migrate": "node --env-file=.env node_modules/prisma/build/index.js migrate deploy --schema apps/api/prisma/schema.prisma",
+    "db:seed": "node --env-file=.env node_modules/tsx/dist/cli.mjs --tsconfig apps/api/tsconfig.json apps/api/prisma/seed.ts",
+    "env:init": "node scripts/env.mjs",
+    "worker": "node --env-file=.env apps/api/dist/apps/api/src/worker.js",
+    "start:web": "node node_modules/next/dist/bin/next start apps/web --hostname 0.0.0.0 --port 3000",
+    "start:api": "node --env-file=.env apps/api/dist/apps/api/src/main.js"
+  },
+  "devDependencies": {
+    "typescript": "^5.9.3",
+    "tsx": "^4.20.6",
+    "vitest": "^5.0.5",
+    "@playwright/test": "^1.56.1",
+    "@types/node": "^22.18.0"
+  },
+  "overrides": {
+    "multer": "2.5.0",
+    "js-yaml": "5.5.0",
+    "deepmerge-ts": "8.0.2"
+  }
+}
